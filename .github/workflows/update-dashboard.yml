@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "data/**.csv"
+      - "scripts/**.py"
+      - "docs/index.html"
   workflow_dispatch: {}   # lets you trigger it manually from the Actions tab
 
 permissions:
