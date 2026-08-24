@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Power bank fleet connectivity</title>
+<style>
+  :root {
+    --bg: #fafaf9;
+    --surface: #ffffff;
+    --border: #e4e2dd;
+    --border-strong: #d1cfc9;
+    --text-primary: #1a1a18;
+    --text-secondary: #5c5a54;
+    --text-muted: #8a877f;
+    --accent: #2563eb;
+    --green: #0ca30c;
+    --yellow: #d99a00;
+    --red: #d9662f;
+    --critical: #c22f2f;
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    line-height: 1.4;
+  }
+  .wrap {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 20px 64px;
+  }
+  header h1 {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0 0 4px;
+  }
+  header p {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin: 0 0 24px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .stat-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .stat {
+    flex: 1;
+    min-width: 130px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+  }
+  .stat .label { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+  .stat .value { font-size: 22px; font-weight: 600; }
+  #chartWrap { position: relative; height: 180px; margin-bottom: 4px; }
+  .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .filter-bar button {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 14px; font-size: 13px; font-weight: 500;
+    border-radius: 999px; border: 1px solid var(--border-strong);
+    background: var(--surface); color: var(--text-primary);
+    cursor: pointer;
+  }
+  .filter-bar button.active { border-width: 1.5px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+  input[type="text"] {
+    width: 100%; padding: 9px 12px; font-size: 14px;
+    border: 1px solid var(--border-strong); border-radius: var(--radius);
+    margin-bottom: 12px; background: var(--surface); color: var(--text-primary);
+  }
+  .count-label { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+  colgroup .c-dot { width: 22px; }
+  colgroup .c-station { width: 72px; }
+  colgroup .c-place { width: 26%; }
+  colgroup .c-pct { width: 56px; }
+  colgroup .c-days { width: 48px; }
+  colgroup .c-link { width: 32px; }
+  th {
+    text-align: left; padding: 8px 6px; font-weight: 600;
+    color: var(--text-secondary); border-bottom: 1px solid var(--border-strong);
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.02em;
+  }
+  th.num, td.num { text-align: right; }
+  td { padding: 7px 6px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  td.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  tr:hover td { background: #f5f4f1; }
+  a.fleet-link {
+    color: var(--accent); text-decoration: none; font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  a.fleet-link:hover { text-decoration: underline; }
+  footer { margin-top: 28px; font-size: 12px; color: var(--text-muted); }
+  .table-scroll { overflow-x: auto; }
+  @media (max-width: 480px) {
+    .stat { min-width: 45%; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Power bank fleet connectivity</h1>
+    <p id="weekLabel">Loading…</p>
+  </header>
+
+  <div class="stat-row" id="statRow"></div>
+
+  <div class="card">
+    <div id="chartWrap"><canvas id="statusChart"></canvas></div>
+  </div>
+
+  <div class="filter-bar" id="filterBar"></div>
+  <input type="text" id="searchBox" placeholder="Search by station number, place or address">
+  <div class="count-label" id="countLabel"></div>
+  <div class="table-scroll">
+    <table>
+      <colgroup>
+        <col class="c-dot"><col class="c-station"><col class="c-place"><col><col class="c-pct"><col class="c-days"><col class="c-link">
+      </colgroup>
+      <thead>
+        <tr>
+          <th></th>
+          <th>Station</th>
+          <th>Place</th>
+          <th>Address</th>
+          <th class="num">Conn.</th>
+          <th class="num">Days</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+  <footer id="footerNote"></footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const catMeta = {
+  '0_connection': { label: '0% connected', color: '#c22f2f' },
+  'red':          { label: '0-25% connected', color: '#d9662f' },
+  'yellow':       { label: '25-50% connected', color: '#d99a00' },
+  'green':        { label: '50%+ connected', color: '#0ca30c' }
+};
+const catOrder = ['0_connection', 'red', 'yellow', 'green'];
+
+let stations = [];
+let counts = {};
+let activeFilter = catOrder[0];
+let searchTerm = '';
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function fleetUrl(s) {
+  return 'https://fleet.yango.com/snickers/vendings/' + encodeURIComponent(s.display) + '?park_id=' + encodeURIComponent(s.parkId);
+}
+
+function renderStats(data) {
+  const row = document.getElementById('statRow');
+  const total = stations.length;
+  row.innerHTML = catOrder.map(c => {
+    const n = counts[c] || 0;
+    const pct = total ? Math.round(n / total * 100) : 0;
+    return `<div class="stat"><div class="label">${esc(catMeta[c].label)}</div>
+      <div class="value" style="color:${catMeta[c].color}">${n}</div>
+      <div class="label">${pct}% of fleet</div></div>`;
+  }).join('');
+}
+
+function renderChart() {
+  new Chart(document.getElementById('statusChart'), {
+    type: 'bar',
+    data: {
+      labels: catOrder.map(c => catMeta[c].label),
+      datasets: [{
+        data: catOrder.map(c => counts[c] || 0),
+        backgroundColor: catOrder.map(c => catMeta[c].color),
+        borderRadius: 4,
+        barThickness: 22
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (ctx) => ctx.parsed.x + ' stations' } }
+      },
+      scales: {
+        x: { grid: { color: '#eceae5' }, ticks: { color: '#8a877f' } },
+        y: { grid: { display: false }, ticks: { color: '#1a1a18' } }
+      }
+    }
+  });
+}
+
+function renderFilterBar() {
+  const bar = document.getElementById('filterBar');
+  bar.innerHTML = catOrder.map(c => {
+    const active = c === activeFilter;
+    const color = catMeta[c].color;
+    return `<button data-filter="${c}" class="${active ? 'active' : ''}" style="border-color:${active ? color : ''};background:${active ? color + '1a' : ''}">
+      <span class="dot" style="background:${color}"></span>${esc(catMeta[c].label)} (${counts[c] || 0})</button>`;
+  }).join('');
+  bar.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      activeFilter = btn.getAttribute('data-filter');
+      renderFilterBar();
+      renderTable();
+    });
+  });
+}
+
+function renderTable() {
+  const term = searchTerm.trim().toLowerCase();
+  let rows = stations.filter(s => s.category === activeFilter);
+  if (term) {
+    rows = rows.filter(s =>
+      s.display.toLowerCase().includes(term) ||
+      s.place.toLowerCase().includes(term) ||
+      s.address.toLowerCase().includes(term)
+    );
+  }
+  rows = rows.slice().sort((a, b) => a.pct - b.pct || b.days - a.days);
+  document.getElementById('countLabel').textContent = rows.length + ' station' + (rows.length === 1 ? '' : 's');
+  const body = document.getElementById('tableBody');
+  body.innerHTML = rows.map(s => {
+    const m = catMeta[s.category];
+    return `<tr>
+      <td><span class="dot" style="background:${m.color}" title="${esc(m.label)}"></span></td>
+      <td>${esc(s.display)}</td>
+      <td class="truncate" title="${esc(s.place)}">${esc(s.place)}</td>
+      <td class="truncate" title="${esc(s.address)}">${esc(s.address)}</td>
+      <td class="num">${Math.round(s.pct)}%</td>
+      <td class="num">${s.days}</td>
+      <td><a class="fleet-link" href="${fleetUrl(s)}" target="_blank" rel="noopener" title="Open in fleetroom" aria-label="Open station ${esc(s.display)} in fleetroom">↗</a></td>
+    </tr>`;
+  }).join('');
+}
+
+fetch('data/latest.json?v=' + Date.now())
+  .then(r => r.json())
+  .then(data => {
+    stations = data.stations;
+    counts = data.counts;
+    document.getElementById('weekLabel').textContent =
+      `Week of ${data.week_start} to ${data.week_end} (Bogotá time) · deployed stations only, warehouse excluded`;
+    document.getElementById('footerNote').textContent =
+      `Generated ${new Date(data.generated_at).toLocaleString()} from ${data.source_csv} · ` +
+      `${data.warehouse_excluded} warehouse units excluded · ${data.not_yet_deployed_this_week} stations not yet deployed that week`;
+    renderStats(data);
+    renderChart();
+    renderFilterBar();
+    renderTable();
+    document.getElementById('searchBox').addEventListener('input', (e) => {
+      searchTerm = e.target.value;
+      renderTable();
+    });
+  })
+  .catch(err => {
+    document.getElementById('weekLabel').textContent = 'Could not load data/latest.json — has the pipeline run yet?';
+    console.error(err);
+  });
+</script>
+</body>
+</html>
