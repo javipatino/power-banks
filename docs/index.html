@@ -116,6 +116,11 @@
   <header>
     <h1>Power bank fleet connectivity</h1>
     <p id="weekLabel">Loading…</p>
+    <p style="font-size:13px;color:var(--text-secondary);margin:0 0 20px;">
+      <strong>% connected</strong> = share of that week's hours the station was online and reachable,
+      based on its connection/disconnection log. Stations installed mid-week are measured only from
+      their install date onward, not the full week.
+    </p>
   </header>
 
   <div class="stat-row" id="statRow"></div>
@@ -154,7 +159,7 @@
 <script>
 const catMeta = {
   '0_connection': { label: '0% connected', color: '#c22f2f' },
-  'red':          { label: '0-25% connected', color: '#d9662f' },
+  'red':          { label: '1-25% connected', color: '#d9662f' },
   'yellow':       { label: '25-50% connected', color: '#d99a00' },
   'green':        { label: '50%+ connected', color: '#0ca30c' }
 };
