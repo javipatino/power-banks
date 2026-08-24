@@ -112,14 +112,16 @@ def main():
             not_yet_created += 1
             continue
 
-        denom_hours = (week_end - effective_start).total_seconds() / 3600
-        events = json.loads(r["Disconnections"])
         status = r["Status"]
 
-        if len(events) == 0 and status == "not_responding":
-            category = "0_connection"
-            pct = 0.0
+        if status == "not_responding":
+            # Live status wins outright, regardless of this week's history:
+            # if it's not responding right now, it goes in this bucket, full stop.
+            category = "not_responding"
+            pct = None
         else:
+            denom_hours = (week_end - effective_start).total_seconds() / 3600
+            events = json.loads(r["Disconnections"])
             intervals = []
             for ev in events:
                 ds = ev.get("disconnection_time")
@@ -144,13 +146,13 @@ def main():
                 "place": r["PlaceName"].strip() or "(no name)",
                 "address": r["Address"].strip() or "(no address)",
                 "category": category,
-                "pct": round(pct, 1),
+                "pct": round(pct, 1) if pct is not None else None,
                 "days": (week_end - loc_created).days,
             }
         )
 
-    cat_order = {"0_connection": 0, "red": 1, "yellow": 2, "green": 3}
-    results.sort(key=lambda r: (cat_order[r["category"]], r["pct"], -r["days"]))
+    cat_order = {"not_responding": 0, "red": 1, "yellow": 2, "green": 3}
+    results.sort(key=lambda r: (cat_order[r["category"]], r["pct"] or 0, -r["days"]))
 
     counts = {c: 0 for c in cat_order}
     for r in results:
