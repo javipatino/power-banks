@@ -118,8 +118,9 @@
     <p id="weekLabel">Loading…</p>
     <p style="font-size:13px;color:var(--text-secondary);margin:0 0 20px;">
       <strong>% connected</strong> = share of that week's hours the station was online and reachable,
-      based on its connection/disconnection log. Stations installed mid-week are measured only from
-      their install date onward, not the full week.
+      based on its connection/disconnection log. Only shown for stations currently reporting <strong>ok</strong>.
+      Stations currently <strong>not_responding</strong> are grouped separately regardless of how their week went.
+      Stations installed mid-week are measured only from their install date onward, not the full week.
     </p>
   </header>
 
@@ -158,12 +159,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
 const catMeta = {
-  '0_connection': { label: '0% connected', color: '#c22f2f' },
-  'red':          { label: '1-25% connected', color: '#d9662f' },
-  'yellow':       { label: '25-50% connected', color: '#d99a00' },
-  'green':        { label: '50%+ connected', color: '#0ca30c' }
+  'not_responding': { label: 'not_responding', color: '#c22f2f' },
+  'red':            { label: '0-25% connected', color: '#d9662f' },
+  'yellow':         { label: '25-50% connected', color: '#d99a00' },
+  'green':          { label: '50%+ connected', color: '#0ca30c' }
 };
-const catOrder = ['0_connection', 'red', 'yellow', 'green'];
+const catOrder = ['not_responding', 'red', 'yellow', 'green'];
 
 let stations = [];
 let counts = {};
@@ -247,17 +248,18 @@ function renderTable() {
       s.address.toLowerCase().includes(term)
     );
   }
-  rows = rows.slice().sort((a, b) => a.pct - b.pct || b.days - a.days);
+  rows = rows.slice().sort((a, b) => (a.pct ?? 0) - (b.pct ?? 0) || b.days - a.days);
   document.getElementById('countLabel').textContent = rows.length + ' station' + (rows.length === 1 ? '' : 's');
   const body = document.getElementById('tableBody');
   body.innerHTML = rows.map(s => {
     const m = catMeta[s.category];
+    const pctCell = s.pct === null ? '—' : Math.round(s.pct) + '%';
     return `<tr>
       <td><span class="dot" style="background:${m.color}" title="${esc(m.label)}"></span></td>
       <td>${esc(s.display)}</td>
       <td class="truncate" title="${esc(s.place)}">${esc(s.place)}</td>
       <td class="truncate" title="${esc(s.address)}">${esc(s.address)}</td>
-      <td class="num">${Math.round(s.pct)}%</td>
+      <td class="num">${pctCell}</td>
       <td class="num">${s.days}</td>
       <td><a class="fleet-link" href="${fleetUrl(s)}" target="_blank" rel="noopener" title="Open in fleetroom" aria-label="Open station ${esc(s.display)} in fleetroom">↗</a></td>
     </tr>`;
